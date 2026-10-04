@@ -28,7 +28,8 @@ const LIMITS = {
   MIN_DUPLICATE_LINE_CHARS: 10,
   MAX_FINDINGS_PER_RULE_PER_FILE: 5,
   MAX_REPORTED_FINDINGS: 15, // per PR, highest severity first
-  MAX_AI_DIFF_CHARS: 60000,
+  MAX_AI_INPUT_CHARS: 120000,
+  MAX_RULE_TITLE_CHARS: 60,
   SIGNATURE_LOOKAHEAD_CHARS: 300,
 };
 
@@ -50,6 +51,14 @@ const SECRET_PATTERNS = [
 ];
 
 const FAIL_ON_SEVERITIES = ['P0'];
+
+// Who reviews a PR: 'ai' (Gemini, using the plain-text rules in REVIEW_RULES_FILE),
+// 'rules' (the pattern checks in src/rules/) or 'both'.
+const REVIEW_MODE = 'ai';
+const REVIEW_RULES_FILE = 'review-rules.md';
+// In 'ai' mode, run the pattern checks instead when Gemini is down or no key is set,
+// so a PR is never left unreviewed. Set to false for strictly AI-only.
+const AI_FALLBACK_TO_RULES = true;
 
 const BADGE_BASE_URL = 'https://img.shields.io/badge';
 const GITHUB_API_URL = 'https://api.github.com';
@@ -85,6 +94,9 @@ module.exports = {
   ENV_FILE_PATTERN,
   SECRET_PATTERNS,
   FAIL_ON_SEVERITIES,
+  REVIEW_MODE,
+  REVIEW_RULES_FILE,
+  AI_FALLBACK_TO_RULES,
   BADGE_BASE_URL,
   GITHUB_API_URL,
   GITHUB_API_VERSION,

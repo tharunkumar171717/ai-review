@@ -136,3 +136,34 @@ test('AI review returns null (did not run) without an API key', async () => {
   const { runAiReview } = require('../src/ai');
   assert.strictEqual(await runAiReview([{ filename: 'a.js', patch: '@@ -0,0 +1 @@\n+x' }], ''), null);
 });
+
+test('AI prompt contains the plain-text rules and marks changed lines', () => {
+  const { buildPrompt } = require('../src/ai');
+  const file = { ...buildFileModel('src/a.js', 'const a = 1;\nconst b = 2;'), addedLines: new Set([2]) };
+  const prompt = buildPrompt([file], 'RULE: no magic numbers');
+  assert.ok(prompt.includes('RULE: no magic numbers'));
+  assert.ok(prompt.includes(' 1| const a = 1;'));
+  assert.ok(prompt.includes('+2| const b = 2;'));
+});
+
+test('AI prompt never includes the contents of .env files', () => {
+  const { buildPrompt } = require('../src/ai');
+  const env = { ...buildFileModel('.env', 'SECRET_KEY=abc123'), addedLines: new Set([1]) };
+  assert.ok(!buildPrompt([env], 'rules').includes('abc123'));
+});
+
+test('ai mode falls back to the pattern rules when the AI does not run', async () => {
+  const { collectFindings } = require('../src/pullRequest');
+  const saved = { gemini: process.env.GEMINI_API_KEY, legacy: process.env.Google_Gemini_key };
+  delete process.env.GEMINI_API_KEY;
+  delete process.env.Google_Gemini_key;
+  try {
+    const models = [buildFileModel('src/a.js', 'console.log(x);\n')];
+    const { findings, skippedRuleIds } = await collectFindings(models, new Map(), 'ai');
+    assert.deepStrictEqual(ruleIds(findings), ['debug-statement']);
+    assert.deepStrictEqual(skippedRuleIds, ['ai-review']);
+  } finally {
+    if (saved.gemini !== undefined) process.env.GEMINI_API_KEY = saved.gemini;
+    if (saved.legacy !== undefined) process.env.Google_Gemini_key = saved.legacy;
+  }
+});

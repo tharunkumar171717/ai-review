@@ -6,7 +6,19 @@ A zero-dependency GitHub Action that reviews every pull request and posts commen
 - **One summary comment** with counts per severity. It is updated in place on every push, so it doesn't pile up.
 - **The check fails** when a P0 issue is found, so you can block merging on it.
 
-## Rules
+## How it reviews
+
+Set `REVIEW_MODE` in [`src/constants.js`](src/constants.js):
+
+| Mode | Who reviews |
+| --- | --- |
+| `ai` (default) | **Gemini**, following the plain-English rules in [`review-rules.md`](review-rules.md). Edit that file to change what gets flagged. |
+| `rules` | The pattern checks in `src/rules/` (no AI, same result every time) |
+| `both` | Both, merged into one review |
+
+In `ai` mode, if Gemini is down or no key is set, the pattern checks run instead (`AI_FALLBACK_TO_RULES`), so a PR is never left unreviewed. Contents of `.env` files are never sent to the AI.
+
+## Pattern rules (`rules` / `both` mode, and the AI fallback)
 
 | Severity | Rule | What it catches |
 | --- | --- | --- |

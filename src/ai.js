@@ -1,7 +1,10 @@
+const fs = require('fs');
+const path = require('path');
 const {
   RULES,
   SEVERITY,
   LIMITS,
+  REVIEW_RULES_FILE,
   GEMINI_API_URL,
   DEFAULT_GEMINI_MODEL,
   AI_TEMPERATURE,
@@ -9,41 +12,46 @@ const {
   AI_MAX_ATTEMPTS,
   AI_RETRY_DELAY_MS,
 } = require('./constants');
-const { walkPatch } = require('./utils/diff');
 
-const PROMPT = `You are a strict senior code reviewer. Review ONLY the added lines (marked with "+") of this pull request diff.
-Look for bugs, security problems, bad error handling, performance issues and unreadable code.
-Severity: P0 = security hole / crash / data loss, P1 = bug or serious design flaw, P2 = maintainability, P3 = minor nit.
-Respond with a JSON array (empty if nothing important) of objects: {"path": string, "line": number, "severity": "P0"|"P1"|"P2"|"P3", "message": string}.
-"line" must be the number shown after "L" on an added line. Keep each message short and actionable.
+const RULES_PATH = path.resolve(__dirname, '..', REVIEW_RULES_FILE);
 
-DIFF:
-`;
+const INSTRUCTIONS = `You are a strict senior code reviewer for a pull request.
+Apply the REVIEW RULES below to the changed files. Each file is shown in full with line numbers;
+lines starting with "+" were added or changed in this pull request.
+- Report problems on "+" lines. For file- or function-level rules (like length), report on the first line of the file or function.
+- Use the severity the rule gives. For a real problem no rule covers, pick P0-P3 yourself.
+- Report each problem once, and only problems you are confident about.
+Respond ONLY with a JSON array (empty if nothing is wrong) of objects:
+{"path": string, "line": number, "severity": "P0"|"P1"|"P2"|"P3", "rule": string, "message": string}
+"rule" is the short name of the broken rule (e.g. "Hardcoded secret"). Keep "message" short and actionable.`;
 
-function buildAnnotatedDiff(prFiles) {
-  const parts = prFiles.map((file) => {
-    const lines = [`### ${file.filename}`];
-    walkPatch(file.patch, (type, line, text) => {
-      if (type === 'added') lines.push(`L${line} + ${text}`);
-      else if (type === 'context') lines.push(`L${line}   ${text}`);
-    });
-    return lines.join('\n');
-  });
-  return parts.join('\n\n').slice(0, LIMITS.MAX_AI_DIFF_CHARS);
+/** Shows a file with line numbers, marking changed lines with "+". Secrets files are never sent. */
+function numberFile(file) {
+  if (file.isEnvFile) return `### ${file.path} (environment file added - content hidden)`;
+  const body = file.lines.map((text, index) => `${file.addedLines.has(index + 1) ? '+' : ' '}${index + 1}| ${text}`);
+  return `### ${file.path} (${file.lines.length} lines)\n${body.join('\n')}`;
+}
+
+function buildPrompt(files, rulesText = fs.readFileSync(RULES_PATH, 'utf8')) {
+  const code = files.map(numberFile).join('\n\n').slice(0, LIMITS.MAX_AI_INPUT_CHARS);
+  return `${INSTRUCTIONS}\n\nREVIEW RULES:\n${rulesText}\n\nFILES:\n${code}`;
 }
 
 function toFindings(items) {
   if (!Array.isArray(items)) return [];
   return items
     .filter((item) => SEVERITY[item.severity] && item.path && Number.isInteger(item.line) && item.message)
-    .map((item) => ({
-      ruleId: RULES.AI_REVIEW.id,
-      title: RULES.AI_REVIEW.title,
-      severity: item.severity,
-      path: item.path,
-      line: item.line,
-      message: item.message,
-    }));
+    .map((item) => {
+      const rule = typeof item.rule === 'string' ? item.rule.trim().slice(0, LIMITS.MAX_RULE_TITLE_CHARS) : '';
+      return {
+        ruleId: RULES.AI_REVIEW.id,
+        title: rule ? `AI · ${rule}` : RULES.AI_REVIEW.title,
+        severity: item.severity,
+        path: item.path,
+        line: item.line,
+        message: item.message,
+      };
+    });
 }
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -68,16 +76,15 @@ async function callGemini(apiKey, model, prompt, delayMs = AI_RETRY_DELAY_MS) {
 }
 
 /**
- * Asks Gemini to review the diff.
- * Returns null when the AI did not run (no API key, or the call failed) so callers can tell
- * "no AI issues" apart from "no AI answer".
+ * Asks Gemini to review the changed files against review-rules.md.
+ * `files` are file models with an `addedLines` Set. Returns null when the AI did not run
+ * (no API key, or the call failed) so callers can tell "no AI issues" apart from "no AI answer".
  */
-async function runAiReview(prFiles, apiKey, model = DEFAULT_GEMINI_MODEL) {
-  const reviewable = prFiles.filter((file) => file.patch);
+async function runAiReview(files, apiKey, model = DEFAULT_GEMINI_MODEL) {
   if (!apiKey) return null;
-  if (reviewable.length === 0) return [];
+  if (files.length === 0) return [];
   try {
-    const data = await callGemini(apiKey, model, PROMPT + buildAnnotatedDiff(reviewable));
+    const data = await callGemini(apiKey, model, buildPrompt(files));
     return toFindings(JSON.parse(data.candidates?.[0]?.content?.parts?.[0]?.text || '[]'));
   } catch (error) {
     console.warn(`⚠️  AI review skipped: ${error.message}`);
@@ -85,4 +92,4 @@ async function runAiReview(prFiles, apiKey, model = DEFAULT_GEMINI_MODEL) {
   }
 }
 
-module.exports = { runAiReview, callGemini, buildAnnotatedDiff };
+module.exports = { runAiReview, callGemini, buildPrompt };

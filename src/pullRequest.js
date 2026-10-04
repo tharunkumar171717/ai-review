@@ -1,5 +1,12 @@
 const fs = require('fs');
-const { LIMITS, RULES, START_REACTION, DEFAULT_BOT_LOGIN } = require('./constants');
+const {
+  LIMITS,
+  RULES,
+  START_REACTION,
+  DEFAULT_BOT_LOGIN,
+  REVIEW_MODE,
+  AI_FALLBACK_TO_RULES,
+} = require('./constants');
 const { createGithubClient } = require('./github');
 const { runRules, sortFindings } = require('./rules');
 const { runAiReview } = require('./ai');
@@ -49,18 +56,37 @@ function splitFindings(findings, addedLinesByPath, alreadyPosted) {
   return { inline, outside, hiddenCount: findings.length - reported };
 }
 
+const PATTERN_RULE_IDS = Object.values(RULES)
+  .map((rule) => rule.id)
+  .filter((id) => id !== RULES.AI_REVIEW.id);
+
+/**
+ * Runs the reviewers REVIEW_MODE asks for. Returns the findings plus the rule ids that did
+ * not run this time, whose old threads must be left alone.
+ */
+async function collectFindings(models, addedLinesByPath, mode = REVIEW_MODE) {
+  const aiKey = process.env.GEMINI_API_KEY || process.env.Google_Gemini_key;
+  const aiFiles = models.map((model) => ({ ...model, addedLines: addedLinesByPath.get(model.path) || new Set() }));
+  const aiFindings = mode === 'rules' ? null : await runAiReview(aiFiles, aiKey, process.env.GEMINI_MODEL || undefined);
+  const aiFailed = mode !== 'rules' && aiFindings === null;
+  const useRules = mode !== 'ai' || (aiFailed && AI_FALLBACK_TO_RULES);
+  if (mode === 'ai' && aiFailed) {
+    console.warn(useRules ? '⚠️  AI unavailable, falling back to pattern rules.' : '⚠️  AI unavailable, nothing reviewed.');
+  }
+  return {
+    findings: sortFindings([...(useRules ? runRules(models) : []), ...(aiFindings || [])]),
+    skippedRuleIds: [...(aiFindings === null ? [RULES.AI_REVIEW.id] : []), ...(useRules ? [] : PATTERN_RULE_IDS)],
+  };
+}
+
 async function runPullRequest() {
   const context = readPrContext();
   const github = createGithubClient(context);
   await github.addReaction(START_REACTION).catch((error) => console.warn(`⚠️  Could not add reaction: ${error.message}`));
   const prFiles = (await github.listPrFiles()).filter((file) => file.status !== 'removed');
 
-  const aiKey = process.env.GEMINI_API_KEY || process.env.Google_Gemini_key;
-  const aiFindings = await runAiReview(prFiles, aiKey, process.env.GEMINI_MODEL || undefined);
-  const findings = sortFindings([...runRules(loadModels(prFiles)), ...(aiFindings || [])]);
-  const skippedRuleIds = aiFindings === null ? [RULES.AI_REVIEW.id] : [];
-
   const addedLinesByPath = new Map(prFiles.map((file) => [file.filename, parseAddedLines(file.patch)]));
+  const { findings, skippedRuleIds } = await collectFindings(loadModels(prFiles), addedLinesByPath);
   const threads = await syncThreads(github, findings, context.botLogin, skippedRuleIds);
   process.stdout.write(`Threads: ${threads.resolved} auto-resolved, ${threads.reopened} re-opened.\n`);
   const { inline, outside, hiddenCount } = splitFindings(findings, addedLinesByPath, threads.posted);
@@ -74,4 +100,4 @@ async function runPullRequest() {
   return findings;
 }
 
-module.exports = { runPullRequest, splitFindings };
+module.exports = { runPullRequest, splitFindings, collectFindings };
