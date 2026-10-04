@@ -56,7 +56,7 @@ const GITHUB_API_URL = 'https://api.github.com';
 const GITHUB_API_VERSION = '2022-11-28';
 const GITHUB_PAGE_SIZE = 100;
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
-const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
+const DEFAULT_GEMINI_MODEL = 'gemini-3.8-flash';
 const AI_TEMPERATURE = 0.2;
 
 // Login the comments are posted as when REVIEW_BOT_LOGIN isn't set.
