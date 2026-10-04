@@ -15,4 +15,9 @@ function getCartTotal(items) {
   return subtotal + tax + getShipping(subtotal);
 }
 
-module.exports = { getSubtotal, getShipping, getCartTotal };
+function getItemCount(items) {
+  console.log("counting items");
+  return items.reduce((count, item) => count + item.quantity, 0);
+}
+
+module.exports = { getSubtotal, getShipping, getCartTotal, getItemCount };
