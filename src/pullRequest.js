@@ -1,13 +1,12 @@
 const fs = require('fs');
-const { LIMITS, INLINE_MARKER_PREFIX, START_REACTION, DEFAULT_BOT_LOGIN } = require('./constants');
+const { LIMITS, START_REACTION, DEFAULT_BOT_LOGIN } = require('./constants');
 const { createGithubClient } = require('./github');
 const { runRules, sortFindings } = require('./rules');
 const { runAiReview } = require('./ai');
 const { buildFileModel, shouldReview } = require('./utils/source');
 const { parseAddedLines } = require('./utils/diff');
 const { formatInlineComment, formatSummary, formatConsole } = require('./formatter');
-
-const INLINE_RULE_ID = new RegExp(`${INLINE_MARKER_PREFIX}([\\w-]+)`);
+const { findingKey, syncThreads } = require('./threads');
 
 function readPrContext() {
   const { GITHUB_TOKEN, GITHUB_REPOSITORY, GITHUB_EVENT_PATH } = process.env;
@@ -31,18 +30,6 @@ function loadModels(prFiles) {
     .map((file) => buildFileModel(file.filename, fs.readFileSync(file.filename, 'utf8')));
 }
 
-const findingKey = (path, line, ruleId) => `${path}:${line}:${ruleId}`;
-
-/** Keys of inline comments this bot already posted (comments by other accounts are ignored). */
-function existingInlineKeys(reviewComments, botLogin) {
-  return new Set(
-    reviewComments
-      .filter((comment) => comment.user?.login === botLogin)
-      .map((comment) => ({ comment, ruleId: comment.body?.match(INLINE_RULE_ID)?.[1] }))
-      .filter(({ ruleId }) => ruleId)
-      .map(({ comment, ruleId }) => findingKey(comment.path, comment.line, ruleId)),
-  );
-}
 
 /**
  * Splits findings into ones we can comment inline (line is in the diff) and the rest.
@@ -73,8 +60,9 @@ async function runPullRequest() {
   const findings = sortFindings([...runRules(loadModels(prFiles)), ...aiFindings]);
 
   const addedLinesByPath = new Map(prFiles.map((file) => [file.filename, parseAddedLines(file.patch)]));
-  const alreadyPosted = existingInlineKeys(await github.listReviewComments(), context.botLogin);
-  const { inline, outside, hiddenCount } = splitFindings(findings, addedLinesByPath, alreadyPosted);
+  const threads = await syncThreads(github, findings, context.botLogin);
+  process.stdout.write(`Threads: ${threads.resolved} auto-resolved, ${threads.reopened} re-opened.\n`);
+  const { inline, outside, hiddenCount } = splitFindings(findings, addedLinesByPath, threads.posted);
 
   if (inline.length > 0) {
     const comments = inline.map((f) => ({ path: f.path, line: f.line, side: 'RIGHT', body: formatInlineComment(f) }));

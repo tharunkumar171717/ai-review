@@ -2,10 +2,21 @@ const { GITHUB_API_URL, GITHUB_API_VERSION, GITHUB_PAGE_SIZE, SUMMARY_MARKER } =
 
 const NO_CONTENT = 204;
 
-function createGithubClient({ token, repository, prNumber, botLogin }) {
-  const pullPath = `/repos/${repository}/pulls/${prNumber}`;
-  const issuePath = `/repos/${repository}/issues/${prNumber}`;
+const REVIEW_THREADS_QUERY = `
+  query ($owner: String!, $name: String!, $number: Int!) {
+    repository(owner: $owner, name: $name) {
+      pullRequest(number: $number) {
+        reviewThreads(first: 100) {
+          nodes { id isResolved path line comments(first: 1) { nodes { author { login } body } } }
+        }
+      }
+    }
+  }`;
+const RESOLVE_MUTATION = 'mutation ($id: ID!) { resolveReviewThread(input: { threadId: $id }) { thread { id } } }';
+const UNRESOLVE_MUTATION = 'mutation ($id: ID!) { unresolveReviewThread(input: { threadId: $id }) { thread { id } } }';
 
+/** Low-level REST + GraphQL helpers bound to one token. */
+function createRequester(token) {
   async function request(method, path, body) {
     const response = await fetch(`${GITHUB_API_URL}${path}`, {
       method,
@@ -30,6 +41,38 @@ function createGithubClient({ token, repository, prNumber, botLogin }) {
     }
   }
 
+  async function graphql(query, variables) {
+    const result = await request('POST', '/graphql', { query, variables });
+    if (result.errors) throw new Error(`GitHub GraphQL failed: ${JSON.stringify(result.errors)}`);
+    return result.data;
+  }
+
+  return { request, paginate, graphql };
+}
+
+function toThread(node) {
+  const firstComment = node.comments.nodes[0];
+  return {
+    id: node.id,
+    isResolved: node.isResolved,
+    path: node.path,
+    line: node.line,
+    author: firstComment?.author?.login,
+    body: firstComment?.body,
+  };
+}
+
+function createGithubClient({ token, repository, prNumber, botLogin }) {
+  const { request, paginate, graphql } = createRequester(token);
+  const pullPath = `/repos/${repository}/pulls/${prNumber}`;
+  const issuePath = `/repos/${repository}/issues/${prNumber}`;
+
+  async function listReviewThreads() {
+    const [owner, name] = repository.split('/');
+    const data = await graphql(REVIEW_THREADS_QUERY, { owner, name, number: prNumber });
+    return data.repository.pullRequest.reviewThreads.nodes.map(toThread);
+  }
+
   async function upsertSummary(body) {
     const comments = await paginate(`${issuePath}/comments`);
     const existing = comments.find(
@@ -41,7 +84,8 @@ function createGithubClient({ token, repository, prNumber, botLogin }) {
 
   return {
     listPrFiles: () => paginate(`${pullPath}/files`),
-    listReviewComments: () => paginate(`${pullPath}/comments`),
+    listReviewThreads,
+    setThreadResolved: (id, resolve) => graphql(resolve ? RESOLVE_MUTATION : UNRESOLVE_MUTATION, { id }),
     createReview: (commitId, comments) =>
       request('POST', `${pullPath}/reviews`, { commit_id: commitId, event: 'COMMENT', comments }),
     addReaction: (content) => request('POST', `${issuePath}/reactions`, { content }),
