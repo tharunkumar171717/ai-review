@@ -67,16 +67,21 @@ async function callGemini(apiKey, model, prompt, delayMs = AI_RETRY_DELAY_MS) {
   }
 }
 
-/** Asks Gemini to review the diff. Returns [] when no API key is configured or the call fails. */
+/**
+ * Asks Gemini to review the diff.
+ * Returns null when the AI did not run (no API key, or the call failed) so callers can tell
+ * "no AI issues" apart from "no AI answer".
+ */
 async function runAiReview(prFiles, apiKey, model = DEFAULT_GEMINI_MODEL) {
   const reviewable = prFiles.filter((file) => file.patch);
-  if (!apiKey || reviewable.length === 0) return [];
+  if (!apiKey) return null;
+  if (reviewable.length === 0) return [];
   try {
     const data = await callGemini(apiKey, model, PROMPT + buildAnnotatedDiff(reviewable));
     return toFindings(JSON.parse(data.candidates?.[0]?.content?.parts?.[0]?.text || '[]'));
   } catch (error) {
     console.warn(`⚠️  AI review skipped: ${error.message}`);
-    return [];
+    return null;
   }
 }
 

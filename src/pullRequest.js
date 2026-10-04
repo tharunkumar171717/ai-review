@@ -1,5 +1,5 @@
 const fs = require('fs');
-const { LIMITS, DEFAULT_BOT_LOGIN } = require('./constants');
+const { LIMITS, RULES, DEFAULT_BOT_LOGIN } = require('./constants');
 const { createGithubClient } = require('./github');
 const { runRules, sortFindings } = require('./rules');
 const { runAiReview } = require('./ai');
@@ -56,10 +56,11 @@ async function runPullRequest() {
 
   const aiKey = process.env.GEMINI_API_KEY || process.env.Google_Gemini_key;
   const aiFindings = await runAiReview(prFiles, aiKey, process.env.GEMINI_MODEL || undefined);
-  const findings = sortFindings([...runRules(loadModels(prFiles)), ...aiFindings]);
+  const findings = sortFindings([...runRules(loadModels(prFiles)), ...(aiFindings || [])]);
+  const skippedRuleIds = aiFindings === null ? [RULES.AI_REVIEW.id] : [];
 
   const addedLinesByPath = new Map(prFiles.map((file) => [file.filename, parseAddedLines(file.patch)]));
-  const threads = await syncThreads(github, findings, context.botLogin);
+  const threads = await syncThreads(github, findings, context.botLogin, skippedRuleIds);
   process.stdout.write(`Threads: ${threads.resolved} auto-resolved, ${threads.reopened} re-opened.\n`);
   const { inline, outside, hiddenCount } = splitFindings(findings, addedLinesByPath, threads.posted);
 
