@@ -34,8 +34,8 @@ jobs:
           private-key: ${{ secrets.AI_REVIEW_APP_PRIVATE_KEY }}
 
       - name: Run reviewer
-        run: node src/index.js
+        run: node .github/scripts/review.js
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
           REVIEW_BOT_LOGIN: ${{ steps.app-token.outputs.app-slug && format('{0}[bot]', steps.app-token.outputs.app-slug) || 'github-actions[bot]' }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }} # optional - enables the AI review
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
