@@ -59,6 +59,8 @@ const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models'
 const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
 const AI_TEMPERATURE = 0.2;
 
+const START_REACTION = 'eyes'; // 👀 added to the PR when a review starts
+
 const SUMMARY_MARKER = '<!-- ai-review:summary -->';
 const INLINE_MARKER_PREFIX = '<!-- ai-review rule=';
 const LOCAL_FLAG = '--local';
@@ -83,6 +85,7 @@ module.exports = {
   GEMINI_API_URL,
   DEFAULT_GEMINI_MODEL,
   AI_TEMPERATURE,
+  START_REACTION,
   SUMMARY_MARKER,
   INLINE_MARKER_PREFIX,
   LOCAL_FLAG,

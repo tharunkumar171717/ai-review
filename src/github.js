@@ -42,6 +42,7 @@ function createGithubClient({ token, repository, prNumber }) {
     listReviewComments: () => paginate(`${pullPath}/comments`),
     createReview: (commitId, comments) =>
       request('POST', `${pullPath}/reviews`, { commit_id: commitId, event: 'COMMENT', comments }),
+    addReaction: (content) => request('POST', `${issuePath}/reactions`, { content }),
     upsertSummary,
   };
 }
