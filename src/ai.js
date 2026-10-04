@@ -1,4 +1,14 @@
-const { RULES, SEVERITY, LIMITS, GEMINI_API_URL, DEFAULT_GEMINI_MODEL, AI_TEMPERATURE } = require('./constants');
+const {
+  RULES,
+  SEVERITY,
+  LIMITS,
+  GEMINI_API_URL,
+  DEFAULT_GEMINI_MODEL,
+  AI_TEMPERATURE,
+  AI_RETRYABLE_STATUSES,
+  AI_MAX_ATTEMPTS,
+  AI_RETRY_DELAY_MS,
+} = require('./constants');
 const { walkPatch } = require('./utils/diff');
 
 const PROMPT = `You are a strict senior code reviewer. Review ONLY the added lines (marked with "+") of this pull request diff.
@@ -36,21 +46,33 @@ function toFindings(items) {
     }));
 }
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** Calls Gemini, retrying with a growing pause when it is rate-limited or overloaded. */
+async function callGemini(apiKey, model, prompt, delayMs = AI_RETRY_DELAY_MS) {
+  for (let attempt = 1; ; attempt++) {
+    const response = await fetch(`${GEMINI_API_URL}/${model}:generateContent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { responseMimeType: 'application/json', temperature: AI_TEMPERATURE },
+      }),
+    });
+    if (response.ok) return response.json();
+    const canRetry = AI_RETRYABLE_STATUSES.includes(response.status) && attempt < AI_MAX_ATTEMPTS;
+    if (!canRetry) throw new Error(`${response.status} ${await response.text()}`);
+    console.warn(`⚠️  Gemini returned ${response.status}, retrying (attempt ${attempt + 1}/${AI_MAX_ATTEMPTS})...`);
+    await sleep(delayMs * attempt);
+  }
+}
+
 /** Asks Gemini to review the diff. Returns [] when no API key is configured or the call fails. */
 async function runAiReview(prFiles, apiKey, model = DEFAULT_GEMINI_MODEL) {
   const reviewable = prFiles.filter((file) => file.patch);
   if (!apiKey || reviewable.length === 0) return [];
   try {
-    const response = await fetch(`${GEMINI_API_URL}/${model}:generateContent`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: PROMPT + buildAnnotatedDiff(reviewable) }] }],
-        generationConfig: { responseMimeType: 'application/json', temperature: AI_TEMPERATURE },
-      }),
-    });
-    if (!response.ok) throw new Error(`${response.status} ${await response.text()}`);
-    const data = await response.json();
+    const data = await callGemini(apiKey, model, PROMPT + buildAnnotatedDiff(reviewable));
     return toFindings(JSON.parse(data.candidates?.[0]?.content?.parts?.[0]?.text || '[]'));
   } catch (error) {
     console.warn(`⚠️  AI review skipped: ${error.message}`);
@@ -58,4 +80,4 @@ async function runAiReview(prFiles, apiKey, model = DEFAULT_GEMINI_MODEL) {
   }
 }
 
-module.exports = { runAiReview, buildAnnotatedDiff };
+module.exports = { runAiReview, callGemini, buildAnnotatedDiff };
