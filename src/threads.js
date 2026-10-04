@@ -17,16 +17,14 @@ function botThreads(threads, botLogin) {
  * Decides what to do with each of this bot's review threads:
  *  - issue fixed (or its line is gone) and thread open   → resolve
  *  - issue still present but someone resolved the thread → unresolve
- * Threads of `skippedRuleIds` (rules that didn't run this time, e.g. the AI review when Gemini
- * is down) are left untouched, since a missing finding doesn't mean the issue was fixed.
+ * Only call this after a successful review: a missing finding must mean the issue is gone.
  * Returns the actions plus the keys of findings that already have a thread.
  */
-function planThreadSync(threads, findings, botLogin, skippedRuleIds = []) {
+function planThreadSync(threads, findings, botLogin) {
   const current = new Set(findings.map((f) => findingKey(f.path, f.line, f.ruleId)));
   const posted = new Set();
   const actions = [];
   for (const thread of botThreads(threads, botLogin)) {
-    if (skippedRuleIds.includes(thread.ruleId)) continue;
     const key = findingKey(thread.path, thread.line, thread.ruleId);
     const stillThere = thread.line !== null && current.has(key);
     if (stillThere) posted.add(key);
@@ -35,9 +33,9 @@ function planThreadSync(threads, findings, botLogin, skippedRuleIds = []) {
   return { posted, actions };
 }
 
-async function syncThreads(github, findings, botLogin, skippedRuleIds = []) {
+async function syncThreads(github, findings, botLogin) {
   const threads = await github.listReviewThreads();
-  const { posted, actions } = planThreadSync(threads, findings, botLogin, skippedRuleIds);
+  const { posted, actions } = planThreadSync(threads, findings, botLogin);
   const done = [];
   for (const action of actions) {
     try {

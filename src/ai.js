@@ -1,7 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 const {
-  RULES,
+  AI_REVIEW,
+  AI_RULE_ID_PREFIX,
   SEVERITY,
   LIMITS,
   REVIEW_RULES_FILE,
@@ -37,6 +38,9 @@ function buildPrompt(files, rulesText = fs.readFileSync(RULES_PATH, 'utf8')) {
   return `${INSTRUCTIONS}\n\nREVIEW RULES:\n${rulesText}\n\nFILES:\n${code}`;
 }
 
+// "Hardcoded value" → "ai-hardcoded-value", so different issues on one line get different ids.
+const toRuleId = (rule) => AI_RULE_ID_PREFIX + rule.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
 function toFindings(items) {
   if (!Array.isArray(items)) return [];
   return items
@@ -44,8 +48,8 @@ function toFindings(items) {
     .map((item) => {
       const rule = typeof item.rule === 'string' ? item.rule.trim().slice(0, LIMITS.MAX_RULE_TITLE_CHARS) : '';
       return {
-        ruleId: RULES.AI_REVIEW.id,
-        title: rule ? `AI · ${rule}` : RULES.AI_REVIEW.title,
+        ruleId: rule ? toRuleId(rule) : AI_REVIEW.id,
+        title: rule ? `AI · ${rule}` : AI_REVIEW.title,
         severity: item.severity,
         path: item.path,
         line: item.line,
@@ -92,4 +96,11 @@ async function runAiReview(files, apiKey, model = DEFAULT_GEMINI_MODEL) {
   }
 }
 
-module.exports = { runAiReview, callGemini, buildPrompt };
+function readAiConfig() {
+  return {
+    apiKey: process.env.GEMINI_API_KEY || process.env.Google_Gemini_key,
+    model: process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL,
+  };
+}
+
+module.exports = { runAiReview, callGemini, buildPrompt, readAiConfig };

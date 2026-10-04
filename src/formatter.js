@@ -48,10 +48,21 @@ function formatSummary(allFindings, outsideDiff, hiddenCount = 0) {
   return sections.join('\n');
 }
 
+function formatUnavailable() {
+  return [
+    SUMMARY_MARKER,
+    '## 🤖 AI Code Review',
+    '',
+    '⚠️ **The AI review could not run** (Gemini was unavailable or the API key is missing), so this PR has **not** been reviewed.',
+    '',
+    'Re-run the workflow from the **Checks** tab, or push a new commit to try again.',
+  ].join('\n');
+}
+
 function formatConsole(findings) {
   if (findings.length === 0) return '✅ No issues found.';
   const lines = findings.map((f) => `${SEVERITY[f.severity].emoji} [${f.severity}] ${f.path}:${f.line}  ${f.title} - ${f.message}`);
   return [...lines, '', `Total: ${findings.length} issue(s)`].join('\n');
 }
 
-module.exports = { badge, inlineMarker, formatInlineComment, formatSummary, formatConsole };
+module.exports = { badge, inlineMarker, formatInlineComment, formatSummary, formatUnavailable, formatConsole };

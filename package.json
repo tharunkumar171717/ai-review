@@ -1,13 +1,12 @@
 {
   "name": "ai-review",
   "version": "1.0.0",
-  "description": "Rule-based + AI pull request reviewer that posts P0-P3 badged comments",
+  "description": "AI pull request reviewer (Gemini + plain-English rules) that posts P0-P3 badged comments",
   "main": "src/index.js",
   "scripts": {
     "review": "node src/index.js",
     "review:local": "node src/index.js --local src",
-    "demo": "node src/index.js --local examples",
-    "test": "node --test tests/"
+    "demo": "node src/index.js --local examples"
   },
   "engines": {
     "node": ">=20"

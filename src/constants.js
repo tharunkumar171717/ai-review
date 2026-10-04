@@ -1,4 +1,5 @@
 // Every tunable value of the reviewer lives here.
+// WHAT gets flagged is decided by the plain-English rules in REVIEW_RULES_FILE.
 
 const SEVERITY = {
   P0: { label: 'P0', name: 'Critical', color: 'red', emoji: '🔴' },
@@ -9,56 +10,29 @@ const SEVERITY = {
 
 const SEVERITY_ORDER = ['P0', 'P1', 'P2', 'P3'];
 
-const RULES = {
-  HARDCODED_SECRET: { id: 'hardcoded-secret', severity: 'P0', title: 'Hardcoded secret' },
-  ENV_FILE_COMMITTED: { id: 'env-file-committed', severity: 'P0', title: '.env file committed' },
-  FILE_TOO_LONG: { id: 'file-too-long', severity: 'P1', title: 'File too long' },
-  DUPLICATE_CODE: { id: 'duplicate-code', severity: 'P1', title: 'Duplicate code' },
-  FUNCTION_TOO_LONG: { id: 'function-too-long', severity: 'P2', title: 'Function too long' },
-  HARDCODED_VALUE: { id: 'hardcoded-value', severity: 'P2', title: 'Hardcoded value' },
-  DEBUG_STATEMENT: { id: 'debug-statement', severity: 'P3', title: 'Debug statement' },
-  TODO_COMMENT: { id: 'todo-comment', severity: 'P3', title: 'TODO comment' },
-  AI_REVIEW: { id: 'ai-review', title: 'AI review' },
-};
+// Fallback name for an AI finding that doesn't say which rule it broke.
+const AI_REVIEW = { id: 'ai-review', title: 'AI review' };
+const AI_RULE_ID_PREFIX = 'ai-';
 
 const LIMITS = {
-  MAX_FILE_LINES: 500,
-  MAX_FUNCTION_LINES: 50,
-  DUPLICATE_BLOCK_LINES: 6,
-  MIN_DUPLICATE_LINE_CHARS: 10,
-  MAX_FINDINGS_PER_RULE_PER_FILE: 5,
   MAX_REPORTED_FINDINGS: 15, // per PR, highest severity first
   MAX_AI_INPUT_CHARS: 120000,
   MAX_RULE_TITLE_CHARS: 60,
-  SIGNATURE_LOOKAHEAD_CHARS: 300,
 };
 
-// Numbers that are fine to write inline.
-const ALLOWED_NUMBERS = new Set(['0', '1', '2']);
-
-const CODE_EXTENSIONS = ['.js', '.jsx', '.ts', '.tsx', '.mjs', '.cjs'];
-const CONSTANTS_FILE_PATTERN = /(^|\/)(constants?|config|enums?)(\.[\w]+$|\/)/i;
-const TEST_FILE_PATTERN = /(\.test\.|\.spec\.|__tests__\/)/;
-const IGNORED_PATH_PATTERN = /(^|\/)(node_modules|dist|build|coverage|\.git)(\/|$)|\.min\./;
-const ENV_FILE_PATTERN = /(^|\/)\.env(\.(?!example$)[\w.-]+)?$/;
-
-const SECRET_PATTERNS = [
-  /(api[_-]?key|secret|password|passwd|token|access[_-]?key)[\w]*['"]?\s*[:=]\s*(['"`])[^'"`\s]{6,}\2/i,
-  /AIza[0-9A-Za-z_-]{35}/, // Google API key
-  /gh[pousr]_[A-Za-z0-9]{36}/, // GitHub token
-  /sk-[A-Za-z0-9_-]{20,}/, // OpenAI / Anthropic style key
-  /AKIA[0-9A-Z]{16}/, // AWS access key
+// Files sent to the AI for review.
+const CODE_EXTENSIONS = [
+  '.js', '.jsx', '.ts', '.tsx', '.mjs', '.cjs',
+  '.py', '.java', '.go', '.rb', '.php', '.cs', '.kt', '.swift', '.rs',
+  '.css', '.scss', '.html', '.vue', '.svelte', '.sql', '.sh', '.yml', '.yaml',
 ];
+const IGNORED_PATH_PATTERN = /(^|\/)(node_modules|dist|build|coverage|\.git)(\/|$)|\.min\./;
+// .env files are flagged by name only; their contents are never sent to the AI.
+const ENV_FILE_PATTERN = /(^|\/)\.env(\.(?!example$)[\w.-]+)?$/;
 
 const FAIL_ON_SEVERITIES = ['P0'];
 
-// Who reviews a PR: 'ai' (Gemini, using the plain-text rules in REVIEW_RULES_FILE),
-// 'rules' (the pattern checks in src/rules/) or 'both'.
-const REVIEW_MODE = 'ai';
 const REVIEW_RULES_FILE = 'review-rules.md';
-// In 'ai' mode, run the pattern checks instead when Gemini is down or no key is set,
-// so a PR is never left unreviewed. Set to false for strictly AI-only.
-const AI_FALLBACK_TO_RULES = true;
 
 const BADGE_BASE_URL = 'https://img.shields.io/badge';
 const GITHUB_API_URL = 'https://api.github.com';
@@ -84,19 +58,14 @@ const LOCAL_FLAG = '--local';
 module.exports = {
   SEVERITY,
   SEVERITY_ORDER,
-  RULES,
+  AI_REVIEW,
+  AI_RULE_ID_PREFIX,
   LIMITS,
-  ALLOWED_NUMBERS,
   CODE_EXTENSIONS,
-  CONSTANTS_FILE_PATTERN,
-  TEST_FILE_PATTERN,
   IGNORED_PATH_PATTERN,
   ENV_FILE_PATTERN,
-  SECRET_PATTERNS,
   FAIL_ON_SEVERITIES,
-  REVIEW_MODE,
   REVIEW_RULES_FILE,
-  AI_FALLBACK_TO_RULES,
   BADGE_BASE_URL,
   GITHUB_API_URL,
   GITHUB_API_VERSION,
