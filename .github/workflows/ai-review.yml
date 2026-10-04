@@ -23,8 +23,18 @@ jobs:
         with:
           node-version: 20
 
+      # Comments are posted as the "AI Review" GitHub App when it is configured,
+      # otherwise as github-actions[bot].
+      - name: Get AI Review app token
+        id: app-token
+        if: ${{ vars.AI_REVIEW_APP_ID != '' }}
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.AI_REVIEW_APP_ID }}
+          private-key: ${{ secrets.AI_REVIEW_APP_PRIVATE_KEY }}
+
       - name: Run reviewer
         run: node src/index.js
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }} # optional - enables the AI review
