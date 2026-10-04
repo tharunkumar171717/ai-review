@@ -27,6 +27,8 @@ All limits, severities and patterns live in [`src/constants.js`](src/constants.j
 1. Push this repo to GitHub. The workflow in `.github/workflows/ai-review.yml` runs on every PR.
 2. *(Optional, enables the AI review)* add a repo secret `GEMINI_API_KEY` under Settings → Secrets and variables → Actions.
 
+3. *(Optional, gives the comments the name "AI Review")* create a GitHub App with **Pull requests: write**, **Issues: write** and **Contents: read**, and install it on the repo. Then add its App ID as the repo **variable** `AI_REVIEW_APP_ID` and its private key as the repo **secret** `AI_REVIEW_APP_PRIVATE_KEY`. Without it, comments come from `github-actions[bot]`.
+
 To use it in another repo, copy `src/` and the workflow file into that repo.
 
 ## Run locally

@@ -1,13 +1,12 @@
 const fs = require('fs');
-const { LIMITS, INLINE_MARKER_PREFIX } = require('./constants');
+const { LIMITS, START_REACTION, DEFAULT_BOT_LOGIN } = require('./constants');
 const { createGithubClient } = require('./github');
 const { runRules, sortFindings } = require('./rules');
 const { runAiReview } = require('./ai');
 const { buildFileModel, shouldReview } = require('./utils/source');
 const { parseAddedLines } = require('./utils/diff');
 const { formatInlineComment, formatSummary, formatConsole } = require('./formatter');
-
-const INLINE_RULE_ID = new RegExp(`${INLINE_MARKER_PREFIX}([\\w-]+)`);
+const { findingKey, syncThreads } = require('./threads');
 
 function readPrContext() {
   const { GITHUB_TOKEN, GITHUB_REPOSITORY, GITHUB_EVENT_PATH } = process.env;
@@ -21,6 +20,7 @@ function readPrContext() {
     repository: GITHUB_REPOSITORY,
     prNumber: event.pull_request.number,
     headSha: event.pull_request.head.sha,
+    botLogin: process.env.REVIEW_BOT_LOGIN || DEFAULT_BOT_LOGIN,
   };
 }
 
@@ -30,16 +30,6 @@ function loadModels(prFiles) {
     .map((file) => buildFileModel(file.filename, fs.readFileSync(file.filename, 'utf8')));
 }
 
-const findingKey = (path, line, ruleId) => `${path}:${line}:${ruleId}`;
-
-function existingInlineKeys(reviewComments) {
-  return new Set(
-    reviewComments
-      .map((comment) => ({ comment, ruleId: comment.body?.match(INLINE_RULE_ID)?.[1] }))
-      .filter(({ ruleId }) => ruleId)
-      .map(({ comment, ruleId }) => findingKey(comment.path, comment.line, ruleId)),
-  );
-}
 
 /**
  * Splits findings into ones we can comment inline (line is in the diff) and the rest.
@@ -62,6 +52,7 @@ function splitFindings(findings, addedLinesByPath, alreadyPosted) {
 async function runPullRequest() {
   const context = readPrContext();
   const github = createGithubClient(context);
+  await github.addReaction(START_REACTION).catch((error) => console.warn(`⚠️  Could not add reaction: ${error.message}`));
   const prFiles = (await github.listPrFiles()).filter((file) => file.status !== 'removed');
 
   const aiKey = process.env.GEMINI_API_KEY || process.env.Google_Gemini_key;
@@ -69,8 +60,9 @@ async function runPullRequest() {
   const findings = sortFindings([...runRules(loadModels(prFiles)), ...aiFindings]);
 
   const addedLinesByPath = new Map(prFiles.map((file) => [file.filename, parseAddedLines(file.patch)]));
-  const alreadyPosted = existingInlineKeys(await github.listReviewComments());
-  const { inline, outside, hiddenCount } = splitFindings(findings, addedLinesByPath, alreadyPosted);
+  const threads = await syncThreads(github, findings, context.botLogin);
+  process.stdout.write(`Threads: ${threads.resolved} auto-resolved, ${threads.reopened} re-opened.\n`);
+  const { inline, outside, hiddenCount } = splitFindings(findings, addedLinesByPath, threads.posted);
 
   if (inline.length > 0) {
     const comments = inline.map((f) => ({ path: f.path, line: f.line, side: 'RIGHT', body: formatInlineComment(f) }));

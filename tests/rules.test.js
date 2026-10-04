@@ -21,6 +21,10 @@ test('flags committed .env files', () => {
   assert.deepStrictEqual(review('.env.example', 'KEY='), []);
 });
 
+test('does not count the trailing newline as a line', () => {
+  assert.deepStrictEqual(review('src/ok.js', 'let x;\n'.repeat(LIMITS.MAX_FILE_LINES)), []);
+});
+
 test('flags files longer than the limit', () => {
   const content = 'let x;\n'.repeat(LIMITS.MAX_FILE_LINES + 1);
   assert.ok(ruleIds(review('src/big.js', content)).includes('file-too-long'));
@@ -73,4 +77,25 @@ test('reports at most MAX_REPORTED_FINDINGS per PR and hides the rest', () => {
   const { inline, outside, hiddenCount } = splitFindings(findings, added, new Set());
   assert.strictEqual(inline.length + outside.length, LIMITS.MAX_REPORTED_FINDINGS);
   assert.strictEqual(hiddenCount, extra);
+});
+
+test('resolves fixed threads, re-opens resolved threads whose issue is still there', () => {
+  const { planThreadSync } = require('../src/threads');
+  const marker = (rule) => `<!-- ai-review rule=${rule} -->`;
+  const threads = [
+    { id: 'fixed', isResolved: false, path: 'a.js', line: 3, author: 'bot', body: marker('hardcoded-value') },
+    { id: 'wrongly-resolved', isResolved: true, path: 'a.js', line: 4, author: 'bot', body: marker('debug-statement') },
+    { id: 'still-open', isResolved: false, path: 'a.js', line: 5, author: 'bot', body: marker('todo-comment') },
+    { id: 'human', isResolved: false, path: 'a.js', line: 6, author: 'someone', body: 'looks good' },
+  ];
+  const findings = [
+    { path: 'a.js', line: 4, ruleId: 'debug-statement' },
+    { path: 'a.js', line: 5, ruleId: 'todo-comment' },
+  ];
+  const { actions, posted } = planThreadSync(threads, findings, 'bot[bot]');
+  assert.deepStrictEqual(actions, [
+    { threadId: 'fixed', resolve: true },
+    { threadId: 'wrongly-resolved', resolve: false },
+  ]);
+  assert.deepStrictEqual([...posted], ['a.js:4:debug-statement', 'a.js:5:todo-comment']);
 });
