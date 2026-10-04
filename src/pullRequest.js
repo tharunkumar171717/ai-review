@@ -1,5 +1,5 @@
 const fs = require('fs');
-const { LIMITS, RULES, DEFAULT_BOT_LOGIN } = require('./constants');
+const { LIMITS, RULES, START_REACTION, DEFAULT_BOT_LOGIN } = require('./constants');
 const { createGithubClient } = require('./github');
 const { runRules, sortFindings } = require('./rules');
 const { runAiReview } = require('./ai');
@@ -52,6 +52,7 @@ function splitFindings(findings, addedLinesByPath, alreadyPosted) {
 async function runPullRequest() {
   const context = readPrContext();
   const github = createGithubClient(context);
+  await github.addReaction(START_REACTION).catch((error) => console.warn(`⚠️  Could not add reaction: ${error.message}`));
   const prFiles = (await github.listPrFiles()).filter((file) => file.status !== 'removed');
 
   const aiKey = process.env.GEMINI_API_KEY || process.env.Google_Gemini_key;

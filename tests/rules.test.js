@@ -21,6 +21,10 @@ test('flags committed .env files', () => {
   assert.deepStrictEqual(review('.env.example', 'KEY='), []);
 });
 
+test('does not count the trailing newline as a line', () => {
+  assert.deepStrictEqual(review('src/ok.js', 'let x;\n'.repeat(LIMITS.MAX_FILE_LINES)), []);
+});
+
 test('flags files longer than the limit', () => {
   const content = 'let x;\n'.repeat(LIMITS.MAX_FILE_LINES + 1);
   assert.ok(ruleIds(review('src/big.js', content)).includes('file-too-long'));

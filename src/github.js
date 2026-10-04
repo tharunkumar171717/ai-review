@@ -88,6 +88,7 @@ function createGithubClient({ token, repository, prNumber, botLogin }) {
     setThreadResolved: (id, resolve) => graphql(resolve ? RESOLVE_MUTATION : UNRESOLVE_MUTATION, { id }),
     createReview: (commitId, comments) =>
       request('POST', `${pullPath}/reviews`, { commit_id: commitId, event: 'COMMENT', comments }),
+    addReaction: (content) => request('POST', `${issuePath}/reactions`, { content }),
     upsertSummary,
   };
 }

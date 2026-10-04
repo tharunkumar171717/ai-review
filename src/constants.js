@@ -66,6 +66,8 @@ const AI_RETRY_DELAY_MS = 5000; // multiplied by the attempt number
 // Login the comments are posted as when REVIEW_BOT_LOGIN isn't set.
 const DEFAULT_BOT_LOGIN = 'github-actions[bot]';
 
+const START_REACTION = 'eyes'; // 👀 added to the PR when a review starts
+
 const SUMMARY_MARKER = '<!-- ai-review:summary -->';
 const INLINE_MARKER_PREFIX = '<!-- ai-review rule=';
 const LOCAL_FLAG = '--local';
@@ -94,6 +96,7 @@ module.exports = {
   AI_MAX_ATTEMPTS,
   AI_RETRY_DELAY_MS,
   DEFAULT_BOT_LOGIN,
+  START_REACTION,
   SUMMARY_MARKER,
   INLINE_MARKER_PREFIX,
   LOCAL_FLAG,
