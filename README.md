@@ -1,58 +1,28 @@
 # AI PR Review
 
-A zero-dependency GitHub Action that reviews every pull request and posts comments with **P0–P3 severity badges**:
+Every pull request is reviewed by **AI (Google Gemini)** against plain-English rules, and gets comments with **P0–P3 severity badges**.
 
-- **Inline comments** on the changed lines, at most **15 issues per PR** (highest severity first).
-- **One summary comment** with counts per severity. It is updated in place on every push, so it doesn't pile up.
-- **The check fails** when a P0 issue is found, so you can block merging on it.
+## Files
 
-## Rules
+| File | What it is |
+| --- | --- |
+| [`review-rules.md`](review-rules.md) | **The rules.** Plain English, grouped by severity. Edit this to change what gets flagged. |
+| [`.github/scripts/review.js`](.github/scripts/review.js) | The reviewer: sends the changed files + rules to Gemini and posts the comments |
+| [`.github/workflows/ai-review.yml`](.github/workflows/ai-review.yml) | Runs the reviewer on every PR |
+| [`src/app.js`](src/app.js), [`src/constants.js`](src/constants.js) | A tiny sample app to change in PRs |
 
-| Severity | Rule | What it catches |
-| --- | --- | --- |
-| 🔴 P0 | `hardcoded-secret` | API keys, passwords, tokens written in code |
-| 🔴 P0 | `env-file-committed` | `.env` files added to the PR |
-| 🟠 P1 | `file-too-long` | Files over **500** lines |
-| 🟠 P1 | `duplicate-code` | 6+ identical lines copied from elsewhere in the PR (not reused) |
-| 🟡 P2 | `function-too-long` | Functions over **50** lines (declarations, arrows, methods) |
-| 🟡 P2 | `hardcoded-value` | Magic numbers and URLs outside a `constants`/`config` file |
-| 🔵 P3 | `debug-statement` | `console.log`, `debugger` |
-| 🔵 P3 | `todo-comment` | `TODO` / `FIXME` / `HACK` |
-| any | `ai-review` | Optional Gemini review for bugs, security and readability |
+## What happens on a PR
 
-All limits, severities and patterns live in [`src/constants.js`](src/constants.js).
-
-## Setup
-
-1. Push this repo to GitHub. The workflow in `.github/workflows/ai-review.yml` runs on every PR.
-2. *(Optional, enables the AI review)* add a repo secret `GEMINI_API_KEY` under Settings → Secrets and variables → Actions.
-
-3. *(Optional, gives the comments the name "AI Review")* create a GitHub App with **Pull requests: write**, **Issues: write** and **Contents: read**, and install it on the repo. Then add its App ID as the repo **variable** `AI_REVIEW_APP_ID` and its private key as the repo **secret** `AI_REVIEW_APP_PRIVATE_KEY`. Without it, comments come from `github-actions[bot]`.
-
-To use it in another repo, copy `src/` and the workflow file into that repo.
-
-## Run locally
-
-```bash
-npm test               # unit tests
-npm run demo           # review examples/badExample.js
-node src/index.js --local path/to/project
-```
-
-## Project layout
-
-```
-src/
-  index.js          entry point (CI mode or --local)
-  pullRequest.js    GitHub flow: fetch PR files → run rules → post comments
-  github.js         GitHub REST client
-  ai.js             optional Gemini review
-  formatter.js      badges + comment markdown
-  constants.js      every limit / pattern / URL
-  rules/            one file per rule
-  utils/            source stripping, function finder, diff parser, .env loader
-```
+1. 👀 reaction from the bot
+2. Gemini reviews every changed file against `review-rules.md`
+3. Badged comments on the changed lines (max 15, most serious first) plus one summary comment
+4. ❌ The check fails on any **P0**, or if the AI couldn't run
 
 ## Merge rules
 
-`main` is protected: every change goes through a pull request, and `.github/CODEOWNERS` requires approval from **@tharunkumar171717** before it can be merged. Pushing new commits after approval resets the approval.
+`main` needs a pull request, approval from **@tharunkumar171717**, and every review comment resolved.
+
+## Setup
+
+- Repo secret `GEMINI_API_KEY`
+- *(Optional, custom bot name)* a GitHub App with **Pull requests: write** and **Issues: write**, installed on the repo, with its ID in the variable `AI_REVIEW_APP_ID` and its private key in the secret `AI_REVIEW_APP_PRIVATE_KEY`
