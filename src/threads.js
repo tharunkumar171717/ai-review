@@ -34,9 +34,18 @@ function planThreadSync(threads, findings, botLogin) {
 
 async function syncThreads(github, findings, botLogin) {
   const { posted, actions } = planThreadSync(await github.listReviewThreads(), findings, botLogin);
-  for (const action of actions) await github.setThreadResolved(action.threadId, action.resolve);
-  const resolved = actions.filter((action) => action.resolve).length;
-  return { posted, resolved, reopened: actions.length - resolved };
+  const done = [];
+  for (const action of actions) {
+    try {
+      await github.setThreadResolved(action.threadId, action.resolve);
+      done.push(action);
+    } catch (error) {
+      // Resolving threads needs "Contents: write"; don't fail the whole review without it.
+      console.warn(`⚠️  Could not ${action.resolve ? 'resolve' : 'unresolve'} thread: ${error.message}`);
+    }
+  }
+  const resolved = done.filter((action) => action.resolve).length;
+  return { posted, resolved, reopened: done.length - resolved };
 }
 
 module.exports = { findingKey, planThreadSync, syncThreads };
