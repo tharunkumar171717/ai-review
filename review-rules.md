@@ -15,6 +15,12 @@ Each rule says which severity to use.
 - **File too long**: a file over 500 lines. Suggest how to split it.
 - **Duplicate code**: a block of 6 or more lines copied instead of reused. Point to the original and suggest a shared function.
 - **Bug**: wrong logic, missing `await`, assignment instead of comparison, wrong condition, off-by-one.
+- **Secret exposure**: code that reads a secret (API keys, tokens, passwords, private keys, `process.env` values, secrets from config) and then exposes it:
+  - logs or prints it (`console.log`, a logger, `print`), even partially or inside an object,
+  - puts it in an error message, an exception, or a URL / query string,
+  - returns it in an API response or sends it to the browser,
+  - sends it to an external or unknown server (`fetch`, `axios`, webhooks) other than the service the secret belongs to.
+  Point to where the secret is read and where it leaks.
 
 ## P2 — Medium
 
