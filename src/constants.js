@@ -58,6 +58,10 @@ const GITHUB_PAGE_SIZE = 100;
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 const DEFAULT_GEMINI_MODEL = 'gemini-3.8-flash';
 const AI_TEMPERATURE = 0.2;
+// Gemini errors worth retrying (rate limit, server error, overloaded) and how.
+const AI_RETRYABLE_STATUSES = [429, 500, 503];
+const AI_MAX_ATTEMPTS = 4;
+const AI_RETRY_DELAY_MS = 5000; // multiplied by the attempt number
 
 const START_REACTION = 'eyes'; // 👀 added to the PR when a review starts
 
@@ -88,6 +92,9 @@ module.exports = {
   GEMINI_API_URL,
   DEFAULT_GEMINI_MODEL,
   AI_TEMPERATURE,
+  AI_RETRYABLE_STATUSES,
+  AI_MAX_ATTEMPTS,
+  AI_RETRY_DELAY_MS,
   START_REACTION,
   DEFAULT_BOT_LOGIN,
   SUMMARY_MARKER,

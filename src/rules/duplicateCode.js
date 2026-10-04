@@ -2,11 +2,13 @@ const { RULES, LIMITS } = require('../constants');
 const { createFinding } = require('./finding');
 
 const IMPORT_LINE = /^(import\b|.*\brequire\s*\()/;
+// A bare name like `GEMINI_API_URL,` (import / export lists) isn't logic worth de-duplicating.
+const NAME_ONLY_LINE = /^[\w$]+,?$/;
 
 function meaningfulLines(file) {
   return file.textLines
     .map((text, index) => ({ text: text.trim().replace(/\s+/g, ' '), line: index + 1 }))
-    .filter(({ text }) => text.length >= LIMITS.MIN_DUPLICATE_LINE_CHARS && !IMPORT_LINE.test(text));
+    .filter(({ text }) => text.length >= LIMITS.MIN_DUPLICATE_LINE_CHARS && !IMPORT_LINE.test(text) && !NAME_ONLY_LINE.test(text));
 }
 
 function isOverlapping(first, file, line) {
