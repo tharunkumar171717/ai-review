@@ -124,3 +124,15 @@ test('does not flag shared import / export name lists as duplicate code', () => 
   ]);
   assert.deepStrictEqual(findings, []);
 });
+
+test('leaves AI threads alone when the AI review did not run', () => {
+  const { planThreadSync } = require('../src/threads');
+  const threads = [{ id: 'ai', isResolved: false, path: 'a.js', line: 7, author: 'bot', body: '<!-- ai-review rule=ai-review -->' }];
+  assert.deepStrictEqual(planThreadSync(threads, [], 'bot', ['ai-review']).actions, []);
+  assert.deepStrictEqual(planThreadSync(threads, [], 'bot').actions, [{ threadId: 'ai', resolve: true }]);
+});
+
+test('AI review returns null (did not run) without an API key', async () => {
+  const { runAiReview } = require('../src/ai');
+  assert.strictEqual(await runAiReview([{ filename: 'a.js', patch: '@@ -0,0 +1 @@\n+x' }], ''), null);
+});
