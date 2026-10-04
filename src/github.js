@@ -2,7 +2,7 @@ const { GITHUB_API_URL, GITHUB_API_VERSION, GITHUB_PAGE_SIZE, SUMMARY_MARKER } =
 
 const NO_CONTENT = 204;
 
-function createGithubClient({ token, repository, prNumber }) {
+function createGithubClient({ token, repository, prNumber, botLogin }) {
   const pullPath = `/repos/${repository}/pulls/${prNumber}`;
   const issuePath = `/repos/${repository}/issues/${prNumber}`;
 
@@ -32,7 +32,9 @@ function createGithubClient({ token, repository, prNumber }) {
 
   async function upsertSummary(body) {
     const comments = await paginate(`${issuePath}/comments`);
-    const existing = comments.find((comment) => comment.body?.includes(SUMMARY_MARKER));
+    const existing = comments.find(
+      (comment) => comment.user?.login === botLogin && comment.body?.includes(SUMMARY_MARKER),
+    );
     if (existing) return request('PATCH', `/repos/${repository}/issues/comments/${existing.id}`, { body });
     return request('POST', `${issuePath}/comments`, { body });
   }
