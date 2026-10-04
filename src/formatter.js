@@ -41,6 +41,9 @@ function formatSummary(allFindings, outsideDiff, hiddenCount = 0) {
   if (hiddenCount > 0) {
     sections.push('', `➕ ${hiddenCount} lower-priority issue(s) hidden (max ${LIMITS.MAX_REPORTED_FINDINGS} per PR). Fix the ones above and push again.`);
   }
+  if (allFindings.length > 0) {
+    sections.push('', '🔒 Every review thread must be resolved before merging. Fixed issues are resolved automatically on your next push; resolving a thread without fixing it re-opens it.');
+  }
   sections.push('', '<sub>P0 = must fix before merge · P1 = should fix · P2 = fix soon · P3 = nice to have</sub>');
   return sections.join('\n');
 }
