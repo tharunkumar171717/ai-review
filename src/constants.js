@@ -61,6 +61,9 @@ const AI_TEMPERATURE = 0.2;
 
 const START_REACTION = 'eyes'; // 👀 added to the PR when a review starts
 
+// Login the comments are posted as when REVIEW_BOT_LOGIN isn't set.
+const DEFAULT_BOT_LOGIN = 'github-actions[bot]';
+
 const SUMMARY_MARKER = '<!-- ai-review:summary -->';
 const INLINE_MARKER_PREFIX = '<!-- ai-review rule=';
 const LOCAL_FLAG = '--local';
@@ -86,6 +89,7 @@ module.exports = {
   DEFAULT_GEMINI_MODEL,
   AI_TEMPERATURE,
   START_REACTION,
+  DEFAULT_BOT_LOGIN,
   SUMMARY_MARKER,
   INLINE_MARKER_PREFIX,
   LOCAL_FLAG,
