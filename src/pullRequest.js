@@ -41,17 +41,22 @@ function existingInlineKeys(reviewComments) {
   );
 }
 
-/** Splits findings into ones we can comment inline (line is in the diff) and the rest. */
+/**
+ * Splits findings into ones we can comment inline (line is in the diff) and the rest.
+ * At most MAX_REPORTED_FINDINGS are reported per PR (already-posted ones count too); the rest are hidden.
+ */
 function splitFindings(findings, addedLinesByPath, alreadyPosted) {
   const inline = [];
   const outside = [];
+  let reported = 0;
   for (const finding of findings) {
-    const key = findingKey(finding.path, finding.line, finding.ruleId);
-    if (alreadyPosted.has(key)) continue;
+    if (reported >= LIMITS.MAX_REPORTED_FINDINGS) break;
+    reported++;
+    if (alreadyPosted.has(findingKey(finding.path, finding.line, finding.ruleId))) continue;
     const inDiff = addedLinesByPath.get(finding.path)?.has(finding.line);
-    (inDiff && inline.length < LIMITS.MAX_INLINE_COMMENTS ? inline : outside).push(finding);
+    (inDiff ? inline : outside).push(finding);
   }
-  return { inline, outside };
+  return { inline, outside, hiddenCount: findings.length - reported };
 }
 
 async function runPullRequest() {
@@ -65,13 +70,13 @@ async function runPullRequest() {
 
   const addedLinesByPath = new Map(prFiles.map((file) => [file.filename, parseAddedLines(file.patch)]));
   const alreadyPosted = existingInlineKeys(await github.listReviewComments());
-  const { inline, outside } = splitFindings(findings, addedLinesByPath, alreadyPosted);
+  const { inline, outside, hiddenCount } = splitFindings(findings, addedLinesByPath, alreadyPosted);
 
   if (inline.length > 0) {
     const comments = inline.map((f) => ({ path: f.path, line: f.line, side: 'RIGHT', body: formatInlineComment(f) }));
     await github.createReview(context.headSha, comments);
   }
-  await github.upsertSummary(formatSummary(findings, outside));
+  await github.upsertSummary(formatSummary(findings, outside, hiddenCount));
   process.stdout.write(`${formatConsole(findings)}\n`);
   return findings;
 }

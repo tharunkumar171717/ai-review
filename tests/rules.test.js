@@ -62,3 +62,15 @@ test('parses added line numbers from a patch', () => {
   const patch = '@@ -1,3 +1,4 @@\n line1\n-old\n+new\n+added\n line3';
   assert.deepStrictEqual([...parseAddedLines(patch)], [2, 3]);
 });
+
+test('reports at most MAX_REPORTED_FINDINGS per PR and hides the rest', () => {
+  const { splitFindings } = require('../src/pullRequest');
+  const extra = 3;
+  const findings = Array.from({ length: LIMITS.MAX_REPORTED_FINDINGS + extra }, (_, i) => ({
+    ruleId: 'r', path: 'a.js', line: i + 1, severity: 'P3',
+  }));
+  const added = new Map([['a.js', new Set(findings.map((f) => f.line))]]);
+  const { inline, outside, hiddenCount } = splitFindings(findings, added, new Set());
+  assert.strictEqual(inline.length + outside.length, LIMITS.MAX_REPORTED_FINDINGS);
+  assert.strictEqual(hiddenCount, extra);
+});

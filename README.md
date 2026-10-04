@@ -2,7 +2,7 @@
 
 A zero-dependency GitHub Action that reviews every pull request and posts comments with **P0–P3 severity badges**:
 
-- **Inline comments** on the changed lines.
+- **Inline comments** on the changed lines, at most **15 issues per PR** (highest severity first).
 - **One summary comment** with counts per severity. It is updated in place on every push, so it doesn't pile up.
 - **The check fails** when a P0 issue is found, so you can block merging on it.
 
@@ -50,3 +50,7 @@ src/
   rules/            one file per rule
   utils/            source stripping, function finder, diff parser, .env loader
 ```
+
+## Merge rules
+
+`main` is protected: every change goes through a pull request, and `.github/CODEOWNERS` requires approval from **@tharunkumar171717** before it can be merged. Pushing new commits after approval resets the approval.

@@ -1,4 +1,4 @@
-const { SEVERITY, SEVERITY_ORDER, BADGE_BASE_URL, SUMMARY_MARKER, INLINE_MARKER_PREFIX } = require('./constants');
+const { SEVERITY, SEVERITY_ORDER, LIMITS, BADGE_BASE_URL, SUMMARY_MARKER, INLINE_MARKER_PREFIX } = require('./constants');
 
 function badge(severityKey) {
   const { label, name, color } = SEVERITY[severityKey];
@@ -32,11 +32,14 @@ function findingsTable(findings) {
   return ['| Severity | Location | Rule | Details |', '| --- | --- | --- | --- |', ...rows].join('\n');
 }
 
-function formatSummary(allFindings, outsideDiff) {
+function formatSummary(allFindings, outsideDiff, hiddenCount = 0) {
   const sections = [SUMMARY_MARKER, '## 🤖 AI Code Review', '', countBySeverity(allFindings), ''];
   if (allFindings.length === 0) sections.push('✅ No issues found. Nice work!');
   if (outsideDiff.length > 0) {
     sections.push('### Issues not shown inline', '', findingsTable(outsideDiff));
+  }
+  if (hiddenCount > 0) {
+    sections.push('', `➕ ${hiddenCount} lower-priority issue(s) hidden (max ${LIMITS.MAX_REPORTED_FINDINGS} per PR). Fix the ones above and push again.`);
   }
   sections.push('', '<sub>P0 = must fix before merge · P1 = should fix · P2 = fix soon · P3 = nice to have</sub>');
   return sections.join('\n');
