@@ -95,3 +95,28 @@ test('resolves fixed threads, re-opens resolved threads whose issue is still the
   ]);
   assert.deepStrictEqual([...posted], ['a.js:4:debug-statement', 'a.js:5:todo-comment']);
 });
+
+test('retries Gemini when it is overloaded, then succeeds', async () => {
+  const { callGemini } = require('../src/ai');
+  const realFetch = global.fetch;
+  const statuses = [503, 503, 200];
+  global.fetch = async () => {
+    const status = statuses.shift();
+    return { ok: status === 200, status, json: async () => ({ ok: true }), text: async () => 'busy' };
+  };
+  try {
+    assert.deepStrictEqual(await callGemini('key', 'model', 'prompt', 0), { ok: true });
+    assert.strictEqual(statuses.length, 0);
+  } finally {
+    global.fetch = realFetch;
+  }
+});
+
+test('does not flag shared import / export name lists as duplicate code', () => {
+  const names = Array.from({ length: LIMITS.DUPLICATE_BLOCK_LINES }, (_, i) => `  SOME_LONG_NAME_${i},`).join('\n');
+  const findings = runRules([
+    buildFileModel('src/a.js', `const {\n${names}\n} = require('./constants');`),
+    buildFileModel('src/b.js', `module.exports = {\n${names}\n};`),
+  ]);
+  assert.deepStrictEqual(findings, []);
+});
