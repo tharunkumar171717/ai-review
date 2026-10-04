@@ -15,4 +15,12 @@ function getCartTotal(items) {
   return subtotal + tax + getShipping(subtotal);
 }
 
-module.exports = { getSubtotal, getShipping, getCartTotal };
+function applyCoupon(total, coupon) {
+  console.log("applying coupon", coupon);
+  if (coupon.code = "SAVE10") {
+    return total - total * 0.1;
+  }
+  return total;
+}
+
+module.exports = { getSubtotal, getShipping, getCartTotal, applyCoupon };
