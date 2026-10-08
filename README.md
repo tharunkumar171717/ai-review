@@ -7,7 +7,7 @@ Every pull request is reviewed by **AI (Google Gemini)** against plain-English r
 | File | What it is |
 | --- | --- |
 | [`review-rules.md`](review-rules.md) | **The rules.** Plain English, grouped by severity. Edit this to change what gets flagged. |
-| [`.github/scripts/review.js`](.github/scripts/review.js) | The reviewer: sends the changed files + rules to Gemini and posts the comments |
+| [`.github/scripts/review.js`](.github/scripts/review.js) | The reviewer: sends the changed files + rules (and the rest of the repo as context) to Gemini and posts the comments |
 | [`.github/workflows/ai-review.yml`](.github/workflows/ai-review.yml) | Runs the reviewer on every PR |
 | [`src/app.js`](src/app.js), [`src/constants.js`](src/constants.js) | A tiny sample app to change in PRs |
 
@@ -16,7 +16,7 @@ Every pull request is reviewed by **AI (Google Gemini)** against plain-English r
 Only PRs into the default branch (`main`) are reviewed.
 
 1. 👀 reaction from the bot
-2. Gemini reviews every changed file against `review-rules.md`
+2. Gemini reviews every changed file against `review-rules.md`, with the rest of the repo as read-only context so it can catch changes that break other files
 3. Badged comments on the changed lines (max 15, most serious first) plus one summary comment
 4. ❌ The check fails on any **P0**, or if the AI couldn't run
 
